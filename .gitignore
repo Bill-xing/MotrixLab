@@ -9,3 +9,20 @@ node_modules
 docs/build
 docs/source/user_guide
 docs/source/index.md
+
+# Python build artifacts
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+*.pyc
+
+# Training and experiment outputs
+outputs/
+wandb/
+videos/
+*.tmp
+
+# Local reports and private progress notes
+/*.pdf
+docs/weekly_report_*.md
