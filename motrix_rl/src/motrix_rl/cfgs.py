@@ -96,3 +96,25 @@ class locomotion:
         learning_epochs: int = 5
         mini_batches: int = 3
         learning_rate: float = 3e-4
+
+
+class navigation:
+    @rlcfg("anymal-c-flat-terrain-nav")
+    @dataclass
+    class AnymalCNavPPO(PPOCfg):
+        """
+        Anymal C Navigation RL config
+        """
+
+        seed: int = 42
+        share_policy_value_features: bool = False
+        max_env_steps: int = 1024 * 500_000  # About 5 亿步
+        num_envs: int = 2048
+
+        # Override PPO configuration
+        rollouts: int = 24
+        policy_hidden_layer_sizes: tuple[int, ...] = (256, 128, 64)
+        value_hidden_layer_sizes: tuple[int, ...] = (256, 128, 64)
+        learning_epochs: int = 5
+        mini_batches: int = 4
+        learning_rate: float = 3e-4

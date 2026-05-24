@@ -13,4 +13,16 @@
 # limitations under the License.
 # ==============================================================================
 
-from . import basic, locomotion, navigation  # noqa: F401
+"""Reward helpers for the ANYmal-C navigation environment."""
+
+import numpy as np
+
+
+def apply_termination_penalty(
+    reward: np.ndarray,
+    terminated: np.ndarray,
+    termination_penalty: float,
+) -> np.ndarray:
+    """Apply the terminal-step penalty without discarding the reward signal."""
+    penalty = np.where(terminated, termination_penalty, 0.0)
+    return reward + penalty

@@ -13,4 +13,17 @@
 # limitations under the License.
 # ==============================================================================
 
-from . import basic, locomotion, navigation  # noqa: F401
+"""Anymal C Navigation Environment module.
+
+This module provides:
+- AnymalCNavEnvCfg: Configuration for the Anymal C navigation environment
+- AnymalCNavTask: The navigation task environment implementation
+
+Registered environment:
+- "anymal-c-flat-terrain-nav": Navigation task on flat terrain
+"""
+
+from motrix_envs.navigation.anymal_c.cfg import AnymalCNavEnvCfg
+from motrix_envs.navigation.anymal_c.anymal_c_np import AnymalCNavTask
+
+__all__ = ["AnymalCNavEnvCfg", "AnymalCNavTask"]
