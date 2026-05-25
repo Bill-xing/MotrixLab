@@ -100,21 +100,36 @@ class locomotion:
 
 class navigation:
     @rlcfg("anymal-c-flat-terrain-nav")
+    @rlcfg("anymal_c_navigation_flat")
     @dataclass
-    class AnymalCNavPPO(PPOCfg):
-        """
-        Anymal C Navigation RL config
-        """
-
+    class AnymalCPPOConfig(PPOCfg):
         seed: int = 42
-        share_policy_value_features: bool = False
-        max_env_steps: int = 1024 * 500_000  # About 5 亿步
         num_envs: int = 2048
-
-        # Override PPO configuration
-        rollouts: int = 24
+        play_num_envs: int = 16
+        max_env_steps: int = 100_000_000
+        check_point_interval: int = 100
+        learning_rate: float = 3e-4
+        rollouts: int = 48
+        learning_epochs: int = 6
+        mini_batches: int = 32
+        discount_factor: float = 0.99
+        lambda_param: float = 0.95
+        grad_norm_clip: float = 1.0
+        ratio_clip: float = 0.2
+        value_clip: float = 0.2
+        clip_predicted_values: bool = True
+        learning_rate_scheduler_kl_threshold: float = 0.02
+        entropy_loss_scale: float = 0.005
         policy_hidden_layer_sizes: tuple[int, ...] = (256, 128, 64)
         value_hidden_layer_sizes: tuple[int, ...] = (256, 128, 64)
-        learning_epochs: int = 5
-        mini_batches: int = 4
+
+    @rlcfg("anymal_c_navigation_rough")
+    @dataclass
+    class AnymalCRoughPPOConfig(AnymalCPPOConfig):
+        max_env_steps: int = 200_000_000
         learning_rate: float = 3e-4
+        rollouts: int = 48
+        learning_epochs: int = 6
+        mini_batches: int = 32
+        learning_rate_scheduler_kl_threshold: float = 0.02
+        entropy_loss_scale: float = 0.03

@@ -13,17 +13,18 @@
 # limitations under the License.
 # ==============================================================================
 
-"""Anymal C Navigation Environment module.
+from . import anymal_c_np, cfg  # noqa: F401
+from .anymal_c_np import AnymalCEnv, AnymalCRoughEnv  # noqa: F401
+from .cfg import AnymalCEnvCfg, AnymalCRoughEnvCfg  # noqa: F401
 
-This module provides:
-- AnymalCNavEnvCfg: Configuration for the Anymal C navigation environment
-- AnymalCNavTask: The navigation task environment implementation
+AnymalCNavTask = AnymalCEnv
+AnymalCNavEnvCfg = AnymalCEnvCfg
 
-Registered environment:
-- "anymal-c-flat-terrain-nav": Navigation task on flat terrain
-"""
-
-from motrix_envs.navigation.anymal_c.cfg import AnymalCNavEnvCfg
-from motrix_envs.navigation.anymal_c.anymal_c_np import AnymalCNavTask
-
-__all__ = ["AnymalCNavEnvCfg", "AnymalCNavTask"]
+__all__ = [
+    "AnymalCEnv",
+    "AnymalCEnvCfg",
+    "AnymalCNavEnvCfg",
+    "AnymalCNavTask",
+    "AnymalCRoughEnv",
+    "AnymalCRoughEnvCfg",
+]

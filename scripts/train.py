@@ -99,7 +99,7 @@ def main(argv):
         train_backend = _TRAIN_BACKEND.value  # 用户显式指定
 
     # 根据后端加载对应的 PPO Trainer 实现
-    trainer = None  # 占位，稍后根据后端实例化具体 Trainer
+    trainer = None  # Assigned below based on the selected backend.
     if train_backend == "jax":
         from motrix_rl.skrl.jax.train import ppo
 

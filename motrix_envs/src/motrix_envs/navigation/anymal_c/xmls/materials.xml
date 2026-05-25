@@ -1,0 +1,9 @@
+<mujoco>
+  <asset>
+    <texture name="motphys-ground" type="2d" builtin="checker" mark="edge"
+             rgb1="0.4314 0.5294 0.6431" rgb2="0.8157 0.8549 0.9059"
+             markrgb="0.8 0.8 0.8" width="300" height="300"/>
+    <material name="motphys-ground" texture="motphys-ground" texuniform="true"
+              texrepeat="0.4 0.4" reflectance="0.2"/>
+  </asset>
+</mujoco>

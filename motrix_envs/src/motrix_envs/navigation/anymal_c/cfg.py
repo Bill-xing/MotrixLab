@@ -12,11 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+"""
+ANYmal C 导航环境配置文件
 
-"""Configuration for Anymal C Navigation Task.
-
-该模块定义了Anymal C四足机器人在平坦地形上进行导航任务的所有配置参数。
-包括机器人控制、传感器、奖励函数、命令以及物理仿真参数。
+本模块定义了 ANYmal C 四足机器人导航环境的所有配置参数，包括：
+- 噪声配置：传感器观测的噪声参数
+- 控制配置：动作缩放因子和控制参数
+- 初始化状态：机器人初始位置和关节角度
+- 命令配置：目标位置和朝向的范围
+- 归一化参数：观测数据的归一化系数
+- 资产配置：机器人身体部分和接触几何体
+- 传感器配置：传感器名称映射
+- 奖励配置：奖励函数的缩放系数
 """
 
 import os
@@ -25,254 +32,325 @@ from dataclasses import dataclass, field
 from motrix_envs import registry
 from motrix_envs.base import EnvCfg
 
-# 获取XML模型文件的绝对路径，该文件定义了仿真场景的物理模型
+# 加载机器人模型文件路径（MJCF/XML格式）
 model_file = os.path.dirname(__file__) + "/xmls/scene.xml"
 
 
 @dataclass
-class NoiseCfg:
-    """观测噪声配置。
-
-    用于模拟传感器的噪声，增加环境的随机性，帮助训练更鲁棒的策略。
+class NoiseConfig:
     """
-    # 总体噪声级别系数，1.0表示标准噪声，0表示无噪声
+    传感器噪声配置
+
+    用于模拟真实传感器的测量噪声，提高RL模型的鲁棒性。
+    所有参数都是乘法因子，与观测值相乘得到带噪声的结果。
+    """
+    # 噪声启用开关（0=禁用，1=启用）
     level: float = 1.0
-    # 关节角度观测的噪声尺度 [rad]
+    # 关节角度的噪声标准差（rad）
     scale_joint_angle: float = 0.03
-    # 关节速度观测的噪声尺度 [rad/s]
+    # 关节速度的噪声标准差（rad/s）
     scale_joint_vel: float = 1.5
-    # 陀螺仪（角速度）观测的噪声尺度 [rad/s]
+    # 陀螺仪角速度的噪声标准差（rad/s）
     scale_gyro: float = 0.2
-    # 重力加速度观测的噪声尺度 [m/s^2]
+    # 重力向量的噪声标准差（标准化单位）
     scale_gravity: float = 0.05
-    # 线速度观测的噪声尺度 [m/s]
+    # 线速度的噪声标准差（m/s）
     scale_linvel: float = 0.1
 
 
 @dataclass
-class ControlCfg:
-    """PD控制器配置。
-
-    用于控制Anymal C机器人的12个关节（每条腿3个）。
+class ControlConfig:
     """
-    # 关节刚度系数 [N*m/rad]，值越大机器人越硬，100.0对应Anymal C的较高刚度
-    stiffness: float = 100.0
-    # 关节阻尼系数 [N*m*s/rad]，用于减缓关节运动
-    damping: float = 2.0
-    # 动作缩放系数，用于缩放神经网络输出到关节位置目标值的范围
-    # 值为0.25表示动作范围[-1,1]将被缩放到[-0.25,0.25]弧度
-    action_scale: float = 0.25
+    机器人控制配置
+
+    定义动作空间和力矩控制参数。
+    参考go1的成功配置进行调整。
+    """
+    # 关节刚度[N*m/rad] - 参考go1使用80
+    stiffness: float = 80.0
+
+    # 关节阻尼[N*m*s/rad] - 参考go1使用1
+    damping: float = 1.0
+
+    # 动作缩放系数 - 将[-1, 1]的动作缩放到实际关节角度变化量（rad）
+    # 实际目标角度 = 默认角度 + action * action_scale
+    # 参考go1使用0.05
+    action_scale: float = 0.05
+
+    # 扭矩限制[N*m] - 由XML中的forcerange参数控制
 
 
 @dataclass
-class InitStateCfg:
-    """初始状态配置。
-
-    定义每个训练回合开始时机器人的位置和姿态。
+class InitState:
     """
-    # 机器人初始位置 [x, y, z]，单位为米
-    # z=0.62m是机器人站立时的高度（从脚到机身中心的高度）
-    pos = [0.0, 0.0, 0.62]
+    机器人初始化状态配置
 
-    # Anymal C的默认关节角度 [rad]
-    # 关节命名规则: {LF|RF|LH|RH}_{HAA|HFE|KFE}
-    # 其中:
-    #   - LF: Left Front（左前腿）, RF: Right Front（右前腿）
-    #     LH: Left Hind（左后腿）, RH: Right Hind（右后腿）
-    #   - HAA: Hip Abduction/Adduction（髋关节内外展）
-    #   - HFE: Hip Flexion/Extension（髋关节屈伸）
-    #   - KFE: Knee Flexion/Extension（膝关节屈伸）
+    定义环境重置时机器人的位置、姿态和关节角度。
+    """
+    # 机器人在世界坐标系中的初始位置 [x, y, z]（米）
+    # Z轴高度应与XML中base的初始高度一致，以保证正确的接地
+    pos = [0.0, 0.0, 0.5]
+
+    # 位置随机化范围 [x_min, y_min, x_max, y_max]（米）
+    # 每次环境重置时，在此范围内随机放置机器人，覆盖20m x 20m的区域
+    pos_randomization_range = [-10.0, -10.0, 10.0, 10.0]
+
+    # 默认关节角度字典
+    # key: 关节名称，value: 默认角度（弧度）
+    # 对应ANYmal C的12个驱动关节：
+    # - 4个髋关节外展/内收(HAA): LF/RF/LH/RH_HAA
+    # - 4个髋关节屈伸(HFE): LF/RF/LH/RH_HFE
+    # - 4个膝关节屈伸(KFE): LF/RF/LH/RH_KFE
+    # LF=Left Front(左前), RF=Right Front(右前)
+    # LH=Left Hind(左后), RH=Right Hind(右后)
     default_joint_angles = {
-        # 左前腿：站立姿态
-        "LF_HAA": 0.0,      # 髋关节内外展中立位
-        "LF_HFE": 0.4,      # 髋关节略微屈曲
-        "LF_KFE": -0.8,     # 膝关节屈曲
-        # 右前腿：站立姿态
-        "RF_HAA": 0.0,
-        "RF_HFE": 0.4,
-        "RF_KFE": -0.8,
-        # 左后腿：站立姿态
-        "LH_HAA": 0.0,
-        "LH_HFE": -0.4,     # 髋关节略微伸展
-        "LH_KFE": 0.8,      # 膝关节伸展
-        # 右后腿：站立姿态
-        "RH_HAA": 0.0,
-        "RH_HFE": -0.4,
-        "RH_KFE": 0.8,
+        "LF_HAA": 0.0,   # 左前髋外展（0=中立位置）
+        "RF_HAA": 0.0,   # 右前髋外展
+        "LH_HAA": 0.0,   # 左后髋外展
+        "RH_HAA": 0.0,   # 右后髋外展
+        "LF_HFE": 0.4,   # 左前髋屈伸（正值=屈曲）
+        "RF_HFE": 0.4,   # 右前髋屈伸
+        "LH_HFE": -0.4,  # 左后髋屈伸（负值=伸展）
+        "RH_HFE": -0.4,  # 右后髋屈伸
+        "LF_KFE": -0.8,  # 左前膝屈伸（负值=膝弯曲）
+        "RF_KFE": -0.8,  # 右前膝屈伸
+        "LH_KFE": 0.8,   # 左后膝屈伸（正值=膝伸展）
+        "RH_KFE": 0.8,   # 右后膝屈伸
     }
 
 
 @dataclass
-class CommandsCfg:
-    """导航命令配置。
-
-    定义在导航任务中速度命令的范围和目标位置的范围。
+class Commands:
     """
-    # 速度命令限制 [最小值, 最大值]，分别对应 [vel_x, vel_y, ang_vel]
-    # vel_x：前后方向线速度 [m/s]，范围[0, 2.0]表示只能向前或停止
-    # vel_y：左右方向线速度 [m/s]，范围[-1.0, 1.0]表示可以横向移动
-    # ang_vel：角速度 [rad/s]，范围[-1.0, 1.0]表示可以旋转
-    vel_limit = [
-        [0.0, -1.0, -1.0],  # 最小值
-        [2.0, 1.0, 1.0],    # 最大值
-    ]
+    目标命令配置
 
-    # 导航目标位置范围 [最小值, 最大值]
-    # 定义了在仿真环境中可以生成的目标位置范围
-    pos_range = [
-        [-5.0, -5.0],  # 最小值：x_min [m], y_min [m]
-        [5.0, 5.0],    # 最大值：x_max [m], y_max [m]
-    ]
+    定义RL代理需要追踪的目标位置和朝向的范围。
+    """
+    # 目标位置和朝向范围
+    # 格式: [dx_min, dy_min, yaw_min, dx_max, dy_max, yaw_max]
+    # dx/dy: 目标相对于机器人初始位置的水平偏移（米）
+    # 减小范围到 [-3m, 3m]，使目标更容易到达
+    # yaw: 目标的绝对朝向（弧度），范围[-π, π]
+    pose_command_range = [-3.0, -3.0, -3.14, 3.0, 3.0, 3.14]
 
-    # 命令重采样时间范围 [最小值, 最大值]，单位秒
-    # 表示新的速度命令会在4-10秒的随机间隔内更新
-    # 这会改变机器人需要跟踪的目标速度
-    resampling_time_range = [4.0, 10.0]
+    # 目标点与机器人之间的最大允许高度差（米）
+    # 减小到0.5m，避免生成难以到达的目标点
+    max_height_diff: float = 0.5
+
+    # 目标点的最大允许坡度（弧度）
+    # 约11度，避免目标点在陡坡上导致机器狗难以稳定站立
+    max_target_slope: float = 0.2
+
+    # 机器人生成位置的最大允许坡度（弧度）
+    # 约15度，超过此坡度的位置会被重新采样
+    max_spawn_slope: float = 0.26
+
+    # 目标点采样最大尝试次数
+    max_resample_attempts: int = 20
 
 
 @dataclass
-class NormalizationCfg:
-    """观测归一化系数。
-
-    用于将观测值缩放到合理的范围，通常为[-1, 1]，
-    帮助神经网络更快地训练和收敛。
+class Normalization:
     """
-    # 线速度观测的归一化系数，实际观测会除以此值
-    # 2.0表示最大线速度约2.0 m/s
-    lin_vel: float = 2.0
-    # 角速度观测的归一化系数
-    # 0.25表示最大角速度约0.25 rad/s
-    ang_vel: float = 0.25
-    # 自由度（关节）位置的归一化系数，单位弧度
-    # 1.0表示关节位置范围约[-1, 1]弧度
-    dof_pos: float = 1.0
-    # 自由度（关节）速度的归一化系数，单位rad/s
-    # 0.05表示关节速度范围约[-0.05, 0.05]弧度/秒
-    dof_vel: float = 0.05
+    观测数据归一化配置
+
+    定义观测空间中各分量的归一化系数。
+    归一化后的观测 = 原始观测 * 归一化系数
+    这些系数用于将不同量纲的观测统一到合理的数值范围。
+    """
+    # 线速度的归一化系数（乘法因子）
+    # 用于缩放 [vx, vy, vz] (m/s)
+    lin_vel = 2.0
+    # 角速度的归一化系数（乘法因子）
+    # 用于缩放陀螺仪输出 (rad/s)
+    ang_vel = 0.25
+    # 关节角度的归一化系数
+    # 用于缩放关节位置 (rad)
+    dof_pos = 1.0
+    # 关节速度的归一化系数
+    # 用于缩放关节速度 (rad/s)
+    dof_vel = 0.05
 
 
 @dataclass
-class AssetCfg:
-    """资产（机器人部件）配置。
-
-    定义了机器人各个部件的名称，用于在仿真中识别和交互。
+class Asset:
     """
-    # 机器人身体（躯干）的名称，用于获取其位置和姿态信息
-    body_name: str = "base"
-    # 机器人脚的名称，用于检测脚与地面的接触
-    foot_name: str = "foot"
-    # 大腿（THIGH）和小腿（SHANK）与地面接触时会受到惩罚
-    # 这鼓励机器人用脚着陆而不是用腿的其他部分着陆
-    penalize_contacts_on = ["THIGH", "SHANK"]
-    # 如果机器人的身体（base）与地面接触，则认为机器人摔倒，回合终止
+    资产配置 - 定义机器人模型中的关键身体部分和几何体
+
+    用于指定机器人身体部分的名称和接触检测相关的几何体。
+    """
+    # 机器人主体body的名称（根节点）
+    body_name = "base"
+    # 足部几何体的名称列表，用于脚步接地检测
+    # 包括4只脚的接地传感器
+    foot_names = ["LF_FOOT", "RF_FOOT", "LH_FOOT", "RH_FOOT"]
+    # 检测基座接触的几何体名称列表
+    # 如果这些几何体与地面接触，表示机器人摔倒，应终止episode
     terminate_after_contacts_on = ["base"]
-    # 地面的名称
-    ground: str = "floor"
+    # 地面几何体的名称
+    ground_name = "ground"
 
 
 @dataclass
-class SensorCfg:
-    """传感器配置。
-
-    定义了从仿真环境中获取的传感器数据的名称。
+class Sensor:
     """
-    # 本地线速度传感器的名称，表示机器人相对于自身坐标系的速度
-    local_linvel: str = "local_linvel"
-    # 陀螺仪传感器的名称，用于获取机器人的角速度
-    gyro: str = "gyro"
+    传感器配置 - 定义观测中使用的传感器名称映射
+
+    这些传感器在XML模型文件中定义，此处指定其名称以供环境查询。
+    """
+    # 基座线速度传感器的名称（在XML中定义）
+    base_linvel = "base_linvel"
+    # 基座角速度传感器（陀螺仪）的名称（在XML中定义）
+    base_gyro = "base_gyro"
 
 
 @dataclass
-class RewardsCfg:
-    """导航任务的奖励配置。
-
-    定义了各个奖励分量及其权重，用于引导强化学习代理学习期望的行为。
-    正值表示鼓励的行为，负值表示惩罚的行为。
+class RewardConfig:
     """
+    奖励函数配置
+
+    定义RL训练过程中奖励函数各项的权重系数。
+    参考 go1 的成功配置进行调整。
+    """
+    # 奖励项缩放系数字典
     scales: dict[str, float] = field(
         default_factory=lambda: {
-            # ==================== 导航相关奖励 ====================
-            # 粗粒度位置追踪奖励：鼓励机器人到达目标位置（容差范围2.0米）
-            "position_tracking": 1.0,
-            # 精细位置追踪奖励：鼓励机器人精确到达目标位置（容差范围0.2米）
-            "position_tracking_fine_grained": 1.5,
-            # 朝向追踪惩罚：轻微惩罚不正确的朝向，帮助机器人面向运动方向
-            "orientation_tracking": -0.1,
-
-            # ==================== 运动控制相关奖励 ====================
-            # 回合提前终止惩罚：机器人摔倒或发生碰撞时的重大惩罚
-            "termination_penalty": -200.0,
-            # 线速度追踪奖励：鼓励机器人准确跟踪目标线速度
-            "tracking_lin_vel": 1.0,
-            # 角速度追踪奖励：鼓励机器人准确跟踪目标角速度（权重较小）
-            "tracking_ang_vel": 0.5,
-            # 竖直线速度惩罚：禁止机器人在竖直方向上移动（不应该跳起或下沉）
-            "lin_vel_z": -2.0,
-            # 横滚俯仰角速度惩罚：鼓励机器人保持平衡，避免翻滚
-            "ang_vel_xy": -0.05,
-            # 姿态奖励：轻微鼓励保持竖直姿态（权重为0，实际不起作用）
-            "orientation": -0.0,
-            # 关节扭矩惩罚：轻微惩罚过大的关节扭矩，鼓励高效运动
-            "torques": -0.00001,
-            # 关节速度惩罚：轻微惩罚过高的关节速度（权重为0，实际不起作用）
-            "dof_vel": -0.0,
-            # 关节加速度惩罚：轻微惩罚过高的关节加速度，鼓励平滑运动
-            "dof_acc": -2.5e-7,
-            # 脚脱离地面时间奖励：鼓励良好的步态，即脚要有合理的脱离地面时间
+            # 终止条件的惩罚系数
+            "termination": -0.0,
+            # 速度追踪奖励（参考 go1）
+            "tracking_lin_vel": 1.5,
+            "tracking_ang_vel": 0.3,
+            # 步态奖励
             "feet_air_time": 1.0,
-            # 动作变化率惩罚：轻微惩罚动作突变，鼓励平滑的控制输出
+            # 惩罚项
+            "lin_vel_z": -2.0,
+            "ang_vel_xy": -0.05,
+            "torques": -0.00001,
             "action_rate": -0.001,
-            # 静止惩罚：不鼓励机器人静止不动（权重为0，实际不起作用）
-            "stand_still": -0.0,
-            # 髋关节位置惩罚：鼓励机器人腿部不过度伸展或缩回
-            "hip_pos": -0.5,
+            # 关节位置惩罚（参考 go1 的 hip_pos）
+            "haa_pos": -1.0,
+            "kfe_pos": -0.3,
         }
     )
 
-    # 速度追踪的标准差，用于高斯函数计算奖励
+    # 速度追踪的高斯核参数（参考 go1）
     tracking_sigma: float = 0.25
-    # 粗粒度位置追踪的标准差 [米]，控制位置误差的容差范围
-    position_tracking_std: float = 2.0
-    # 精细位置追踪的标准差 [米]，更严格的位置误差容差范围
-    position_tracking_fine_grained_std: float = 0.2
+
+
+# === 场景文件路径 ===
+rough_model_file = os.path.dirname(__file__) + "/xmls/scene_rough.xml"
 
 
 @registry.envcfg("anymal-c-flat-terrain-nav")
+@registry.envcfg("anymal_c_navigation_flat")
 @dataclass
-class AnymalCNavEnvCfg(EnvCfg):
-    """Anymal C平坦地形导航环境的配置。
-
-    该配置类继承自EnvCfg基类，包含了完整的环境设置，包括：
-    - 物理仿真参数
-    - 机器人控制配置
-    - 传感器配置
-    - 奖励函数设置
-    - 观测和命令的定义
-
-    环境注册为 "anymal-c-flat-terrain-nav"，可通过该名称加载使用。
+class AnymalCEnvCfg(EnvCfg):
     """
-    # 每个训练回合的最大持续时间 [秒]
-    max_episode_seconds: float = 10.0
-    # XML模型文件的路径，定义了机器人和场景的物理属性
+    ANYmal C 导航环境的完整配置类
+
+    @registry.envcfg("anymal_c_navigation_flat") 装饰器将此配置注册到全局环境注册表，
+    环境可通过字符串ID "anymal_c_navigation_flat" 查找并使用此配置。
+
+    主要参数说明：
+    - 模拟参数: 控制仿真的时间步长和物理精度
+    - 一级参数: 环保、重置、速度限制等全局约束
+    - 子配置: 通过组合多个专用配置类来管理复杂的参数空间
+    """
+    # 机器人模型文件路径（MJCF/XML格式）
     model_file: str = model_file
-    # 观测噪声配置实例
-    noise_cfg: NoiseCfg = field(default_factory=NoiseCfg)
-    # PD控制器配置实例
-    control_cfg: ControlCfg = field(default_factory=ControlCfg)
-    # 奖励函数配置实例
-    rewards_cfg: RewardsCfg = field(default_factory=RewardsCfg)
-    # 初始状态配置实例
-    init_state_cfg: InitStateCfg = field(default_factory=InitStateCfg)
-    # 导航命令配置实例
-    commands_cfg: CommandsCfg = field(default_factory=CommandsCfg)
-    # 观测归一化配置实例
-    normalization_cfg: NormalizationCfg = field(default_factory=NormalizationCfg)
-    # 机器人资产配置实例
-    asset_cfg: AssetCfg = field(default_factory=AssetCfg)
-    # 传感器配置实例
-    sensor_cfg: SensorCfg = field(default_factory=SensorCfg)
-    # 仿真时间步长 [秒]，0.005表示200 Hz的仿真频率
+
+    # 重置时的噪声标度因子（应用于初始位置和速度）
+    reset_noise_scale: float = 0.01
+
+    # 单个episode的最大持续时间（秒）
+    max_episode_seconds: float = 10
+
+    # 单个episode的最大步数
+    # 10秒 / 0.01秒 = 1000步
+    max_episode_steps: int = 1000
+
+    # 仿真时间步长（秒），控制物理引擎的积分精度
+    # 0.005秒 = 5毫秒，对应200Hz的仿真频率
     sim_dt: float = 0.005
-    # 控制时间步长 [秒]，0.02表示50 Hz的控制频率
-    # 这意味着每4个仿真步长会执行一次控制命令
-    ctrl_dt: float = 0.02
+
+    # 控制时间步长（秒），智能体多久执行一次新动作
+    # 0.01秒 = 100Hz 控制频率，每2个仿真步执行一次动作
+    ctrl_dt: float = 0.01
+
+    # 初始朝向的随机扰动标度（弧度）
+    reset_yaw_scale: float = 0.1
+
+    # 关节速度的最大阈值（rad/s）
+    # 如果关节速度超过此值，视为异常并终止episode以保护训练稳定性
+    # 初期设置为100 rad/s以给予较大容忍度
+    max_dof_vel: float = 100.0
+
+    # 噪声配置实例 - 传感器测量噪声参数
+    noise_config: NoiseConfig = field(default_factory=NoiseConfig)
+
+    # 控制配置实例 - 动作空间和控制参数
+    control_config: ControlConfig = field(default_factory=ControlConfig)
+
+    # 奖励配置实例 - 奖励函数参数（当前未使用）
+    reward_config: RewardConfig = field(default_factory=RewardConfig)
+
+    # 初始化状态配置实例 - 机器人初始位置和关节角度
+    init_state: InitState = field(default_factory=InitState)
+
+    # 命令配置实例 - 目标位置和朝向范围
+    commands: Commands = field(default_factory=Commands)
+
+    # 归一化配置实例 - 观测数据的标准化系数
+    normalization: Normalization = field(default_factory=Normalization)
+
+    # 资产配置实例 - 机器人身体部分和几何体定义
+    asset: Asset = field(default_factory=Asset)
+
+    # 传感器配置实例 - 传感器名称映射
+    sensor: Sensor = field(default_factory=Sensor)
+
+
+@dataclass
+class TerrainConfig:
+    """
+    崎岖地形配置
+
+    定义地形网格的参数，用于机器人在不同高度区域的放置和训练。
+    """
+    # 地形高度级别列表（米）
+    # 对应高度场中的不同区域高度
+    height_list: tuple[float, ...] = (0.0, 0.5, 1.0)
+
+    # 网格大小（5x5 网格）
+    grid_size: int = 5
+
+    # 每个网格单元的尺寸（米）
+    cell_size: float = 8.0
+
+    # 地形边界半径（米）- 超出此范围将终止 episode
+    border_size: float = 19.0
+
+
+@registry.envcfg("anymal_c_navigation_rough")
+@dataclass
+class AnymalCRoughEnvCfg(AnymalCEnvCfg):
+    """ANYmal C 崎岖地形导航环境配置
+
+    相比平面地形：
+    - 使用崎岖地形场景文件
+    - 渲染间距设为 0（崎岖地形环境不需要间距）
+    - 延长 episode 时长（崎岖地形更具挑战性）
+    - 包含地形配置参数
+    """
+    # 使用崎岖地形场景文件
+    model_file: str = rough_model_file
+
+    # 渲染间距设为 0（崎岖地形环境不需要间距）
+    render_spacing: float = 0.0
+
+    # 延长 episode 时长（崎岖地形更具挑战性）
+    max_episode_seconds: float = 15
+    max_episode_steps: int = 1500
+
+    # 地形配置
+    terrain_config: TerrainConfig = field(default_factory=TerrainConfig)
