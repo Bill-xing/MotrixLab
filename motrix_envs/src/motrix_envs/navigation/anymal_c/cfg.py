@@ -310,6 +310,9 @@ class AnymalCEnvCfg(EnvCfg):
     sensor: Sensor = field(default_factory=Sensor)
 
 
+AnymalCNavEnvCfg = AnymalCEnvCfg
+
+
 @dataclass
 class TerrainConfig:
     """

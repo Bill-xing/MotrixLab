@@ -1300,6 +1300,9 @@ class AnymalCEnv(NpEnv):
         return obs, info
 
 
+AnymalCNavTask = AnymalCEnv
+
+
 @registry.env("anymal_c_navigation_rough", "np")
 class AnymalCRoughEnv(AnymalCEnv):
     """ANYmal C 崎岖地形导航环境
