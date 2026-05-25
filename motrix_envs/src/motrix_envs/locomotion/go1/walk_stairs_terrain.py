@@ -271,15 +271,15 @@ class Go1WalkStairsTask(NpEnv):
         return feet_air_time
 
     def update_contact_force(self, state: NpEnvState):
-        data = state.data
-        pose = self._body.get_pose(data)
-        base_quat = pose[:, 3:7]
-        force = []
-        for foot in self.cfg.sensor.feet:
-            contact_force = self._model.get_sensor_value(foot + "_foot_contact", data)
-            contact_force = Quaternion.rotate_inverse(base_quat, contact_force)
-            force.append(contact_force)
-        return np.concatenate(force, axis=1)
+        contacts = state.info.get("contacts")
+        if contacts is None:
+            cquerys = self._model.get_contact_query(state.data)
+            contacts = cquerys.is_colliding(self.foot_check).reshape((self._num_envs, self.foot_check_num))
+
+        # MotrixSim exposes contact state here, not per-foot contact force sensors.
+        contact_features = np.zeros((self._num_envs, self.foot_check_num, 3), dtype=np.float32)
+        contact_features[:, :, 2] = contacts.astype(np.float32)
+        return contact_features.reshape((self._num_envs, self.foot_check_num * 3))
 
     def resample_commands(self, num_envs: int):
         commands = np.random.uniform(
@@ -436,9 +436,5 @@ class Go1WalkStairsTask(NpEnv):
         )
 
     def _reward_feet_stumble(self, data):
-        # Penalize feet hitting vertical surfaces
-        is_stumble = 0
-        for foot in self.cfg.sensor.feet:
-            contact_force = self._model.get_sensor_value(foot + "_foot_contact", data)
-            is_stumble += (np.linalg.norm(contact_force, axis=1) > 5 * np.abs(contact_force[:, 2])) * 1.0
-        return is_stumble
+        # Stumble detection needs lateral contact force, which is unavailable from the contact query.
+        return np.zeros(data.shape[0], dtype=np.float32)

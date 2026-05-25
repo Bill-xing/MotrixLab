@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import motrix_envs  # noqa: F401
+import numpy as np
 from motrix_envs import registry as env_registry
 
 
@@ -41,6 +42,19 @@ def test_migrated_environments_have_jax_rl_configs():
         assert cfg.num_envs > 0
         assert cfg.rollouts > 0
         assert cfg.max_batch_env_steps > 0
+
+
+def test_migrated_environments_step_once_with_zero_action():
+    for env_name in EXPECTED_ENV_BACKENDS:
+        env = env_registry.make(env_name, "np", num_envs=1)
+        env.init_state()
+        action = np.zeros((1, env.action_space.shape[0]), dtype=np.float32)
+
+        state = env.step(action)
+
+        assert state.obs.shape[0] == 1
+        assert state.reward.shape == (1,)
+        assert state.info["steps"].tolist() == [1]
 
 
 def test_train_script_exposes_pretrained_flag():
