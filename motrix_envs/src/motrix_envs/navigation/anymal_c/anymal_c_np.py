@@ -558,22 +558,6 @@ class AnymalCEnv(NpEnv):
         state.reward = reward
         state.terminated = terminated
 
-        # 调试打印（每200步一次）
-        state.info["steps"] = state.info.get("steps", np.zeros(self._num_envs, dtype=np.int32)) + 1
-        if state.info["steps"][0] % 200 == 0:
-            robot_position = root_pos[:, :2]
-            robot_heading = self._get_heading_from_quat(root_quat)
-            target_position = pose_commands[:, :2]
-            target_heading = pose_commands[:, 2]
-            position_error = np.linalg.norm(target_position - robot_position, axis=1)
-            heading_diff = target_heading - robot_heading
-            heading_diff = np.where(heading_diff > np.pi, heading_diff - 2*np.pi, heading_diff)
-            heading_diff = np.where(heading_diff < -np.pi, heading_diff + 2*np.pi, heading_diff)
-            mean_pos_err = np.mean(position_error)
-            mean_heading_err = np.rad2deg(np.mean(np.abs(heading_diff)))
-            mean_vel = np.mean(np.linalg.norm(base_lin_vel[:, :2], axis=1))
-
-
         return state
 
     def _get_heading_from_quat(self, quat:np.ndarray) -> np.ndarray:
