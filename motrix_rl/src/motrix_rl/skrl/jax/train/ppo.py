@@ -164,7 +164,7 @@ class Trainer:
         self._sim_backend = sim_backend
         self._enable_render = enable_render
 
-    def train(self) -> None:
+    def train(self, pretrained: str | None = None) -> None:
         """
         Start training the agent.
         """
@@ -176,6 +176,8 @@ class Trainer:
         models = self._make_model(skrl_env, rlcfg)
         ppo_cfg = _get_cfg(rlcfg, skrl_env, log_dir=get_log_dir(self._env_name))
         agent = self._make_agent(models, skrl_env, ppo_cfg)
+        if pretrained is not None:
+            agent.load(pretrained)
         cfg_trainer = {
             "timesteps": rlcfg.max_batch_env_steps,
             "headless": not self._enable_render,

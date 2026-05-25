@@ -52,6 +52,8 @@ _TRAIN_BACKEND = flags.DEFINE_string("train-backend", "jax", "The learning backe
 _SEED = flags.DEFINE_integer("seed", None, "Random seed for reproducibility")
 # _RAND_SEED: 若 True 则强制使用随机种子（不固定），提升多样性但牺牲复现性
 _RAND_SEED = flags.DEFINE_bool("rand-seed", False, "Generate random seed")
+# _PRETRAINED: optional checkpoint path loaded before training starts for transfer learning.
+_PRETRAINED = flags.DEFINE_string("pretrained", None, "Path to a checkpoint to load before training")
 
 
 def get_train_backend(supports: utils.DeviceSupports):
@@ -79,6 +81,7 @@ def main(argv):
     # 读取命令行配置
     env_name = _ENV.value  # 环境名称字符串，传递给 Trainer
     enable_render = _RENDER.value  # bool，训练时是否开启渲染
+    pretrained_path = _PRETRAINED.value
 
     # rl_override 用于向 Trainer 传递少量覆盖参数（目前 num_envs 与 seed）
     rl_override = {}  # 字典，键值最终被 Trainer 内部读取并应用到 RL 配置
@@ -116,7 +119,7 @@ def main(argv):
         raise Exception(f"Unknown train backend: {train_backend}")
 
     # 启动训练循环
-    trainer.train()
+    trainer.train(pretrained=pretrained_path)
 
 
 if __name__ == "__main__":
