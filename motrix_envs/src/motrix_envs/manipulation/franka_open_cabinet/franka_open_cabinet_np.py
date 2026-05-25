@@ -120,7 +120,7 @@ class FrankaOpenCabinetEnv(NpEnv):
         # np.random.uniform(0, 1, size) 为每个环境生成一个随机数 r ~ U(0, 1)
         # 如果 r < p，则结果为 1 (成功/抓取)，否则为 0 (失败/释放)
         sampled_gripper_action = np.where(probabilities > np.random.rand(*probabilities.shape), 0, 0.04)[:, None] # 闭合0 打开0.04
-        state.info["current_gripper_action"] = sampled_gripper_action.squeeze()
+        state.info["current_gripper_action"] = sampled_gripper_action[:, 0]
 
         new_pos = np.concatenate([new_joint_pos, sampled_gripper_action], axis=-1)
 
