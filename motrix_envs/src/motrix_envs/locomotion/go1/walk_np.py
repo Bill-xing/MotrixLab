@@ -19,39 +19,8 @@ import numpy as np
 
 from motrix_envs import registry
 from motrix_envs.locomotion.go1.cfg import Go1WalkNpEnvCfg
+from motrix_envs.math.quaternion import Quaternion
 from motrix_envs.np.env import NpEnv, NpEnvState
-
-
-## provide quat math utility from motrixsim.
-def quat_rotate_inverse(quats, v):
-    """
-    Rotate a fixed vector v by a list of quaternions using a vectorized approach.
-
-    Parameters:
-        quats (np.ndarray): Array of quaternions of shape (N, 4). Each quaternion is in [w, x, y, z] format.
-        v (np.ndarray): Fixed vector of shape (3,) to be rotated.
-
-    Returns:
-        np.ndarray: Array of rotated vectors of shape (N, 3).
-    """
-    # Normalize the quaternions to ensure they are unit quaternions
-
-    # Extract the scalar (w) and vector (x, y, z) parts of the quaternions
-    w = quats[:, -1]  # Shape (N,)
-    im = quats[:, :3]  # Shape (N, 3)
-
-    # Compute the cross product between the imaginary part of each quaternion and the fixed vector v.
-    # np.cross broadcasts v to match each row in im, resulting in an array of shape (N, 3)
-    cross_im_v = np.cross(im, v)
-
-    # Compute the intermediate terms for the rotation formula:
-    term1 = w[:, np.newaxis] * cross_im_v  # w * cross(im, v)
-    term2 = np.cross(im, cross_im_v)  # cross(im, cross(im, v))
-
-    # Apply the rotation formula: v_rot = v + 2 * (term1 + term2)
-    v_rotated = v + 2 * (term1 + term2)
-
-    return v_rotated
 
 
 @registry.env("go1-flat-terrain-walk", sim_backend="np")
@@ -146,39 +115,43 @@ class Go1WalkTask(NpEnv):
 
         self._init_dof_pos[-self._num_action :] = self.default_angles
 
-        self.ground = self._model.get_geom_index(cfg.asset.ground)
+        self.ground = []
+        for geom_name in self._model.geom_names:
+            if geom_name is not None and cfg.asset.ground_name in geom_name:
+                self.ground.append(self._model.get_geom_index(geom_name))
         self.termination_contact = None
-        self.foot = []
-        for name in cfg.asset.terminate_after_contacts_on:
-            if self.termination_contact is None:
-                self.termination_contact = np.array([[self._model.get_geom_index(name), self.ground]], dtype=np.uint32)
-            else:
-                self.termination_contact = np.append(
-                    self.termination_contact,
-                    np.array(
-                        [[self._model.get_geom_index(name), self.ground]],
-                        dtype=np.uint32,
-                    ),
-                    axis=0,
-                )
-        for name in cfg.asset.foot_name:
-            self.foot.append([self._model.get_geom_index(name), self.ground])
-        self.num_check = self.termination_contact.shape[0]
-
-        self.foot = None
-        for i in self._model.geom_names:
-            if i is not None and cfg.asset.foot_name in i:
-                if self.foot is None:
-                    self.foot = np.array([[self._model.get_geom_index(i), self.ground]], dtype=np.uint32)
+        for ground_index in self.ground:
+            for name in cfg.asset.terminate_after_contacts_on:
+                if self.termination_contact is None:
+                    self.termination_contact = np.array(
+                        [[self._model.get_geom_index(name), ground_index]], dtype=np.uint32
+                    )
                 else:
-                    self.foot = np.append(
-                        self.foot,
+                    self.termination_contact = np.append(
+                        self.termination_contact,
                         np.array(
-                            [[self._model.get_geom_index(i), self.ground]],
+                            [[self._model.get_geom_index(name), ground_index]],
                             dtype=np.uint32,
                         ),
                         axis=0,
                     )
+        self.num_check = self.termination_contact.shape[0]
+
+        self.foot = None
+        for ground_index in self.ground:
+            for i in self._model.geom_names:
+                if i is not None and cfg.asset.foot_name in i:
+                    if self.foot is None:
+                        self.foot = np.array([[self._model.get_geom_index(i), ground_index]], dtype=np.uint32)
+                    else:
+                        self.foot = np.append(
+                            self.foot,
+                            np.array(
+                                [[self._model.get_geom_index(i), ground_index]],
+                                dtype=np.uint32,
+                            ),
+                            axis=0,
+                        )
         self.foot_check_num = self.foot.shape[0]
         self.foot_check = self.foot
 
@@ -217,7 +190,7 @@ class Go1WalkTask(NpEnv):
         gyro = self.get_gyro(data)
         pose = self._body.get_pose(data)
         base_quat = pose[:, 3:7]
-        local_gravity = quat_rotate_inverse(base_quat, self.gravity_vec)
+        local_gravity = Quaternion.rotate_inverse(base_quat, self.gravity_vec)
         diff = self.get_dof_pos(data) - self.default_angles
         noisy_linvel = linear_vel * self.cfg.normalization.lin_vel
         noisy_gyro = gyro * self.cfg.normalization.ang_vel
@@ -347,7 +320,7 @@ class Go1WalkTask(NpEnv):
         # Penalize non flat base orientation
         pose = self._body.get_pose(data)
         base_quat = pose[:, 3:7]
-        gravity = quat_rotate_inverse(base_quat, self.gravity_vec)
+        gravity = Quaternion.rotate_inverse(base_quat, self.gravity_vec)
         return np.sum(np.square(gravity[:, :2]), axis=1)
 
     def _reward_torques(self, data: mtx.SceneData):

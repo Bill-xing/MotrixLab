@@ -13,4 +13,4 @@
 # limitations under the License.
 # ==============================================================================
 
-from . import go1  # noqa: F401 register envs
+from . import anymal_c, go1, go2  # noqa: F401 register envs
