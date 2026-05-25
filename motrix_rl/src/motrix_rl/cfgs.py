@@ -76,7 +76,44 @@ class basic:
         mini_batches: int = 32
 
 
+class manipulation:
+    @rlcfg("franka_lift_cube")
+    @dataclass
+    class FrankaLiftPPO(PPOCfg):
+        seed: int = 42
+        max_env_steps: int = 4096 * 50000
+        check_point_interval: int = 500
+        share_policy_value_features: bool = True
+
+        policy_hidden_layer_sizes: tuple[int, ...] = (256, 128, 64)
+        value_hidden_layer_sizes: tuple[int, ...] = (256, 128, 64)
+        rollouts: int = 24
+        learning_epochs: int = 8
+        mini_batches: int = 4
+        learning_rate: float = 3e-4
+        learning_rate_scheduler_kl_threshold: float = 0.01
+        entropy_loss_scale: float = 0.001
+        rewards_shaper_scale: float = 0.01
+
+    @rlcfg("franka_open_cabinet")
+    @dataclass
+    class FrankaOpenCabinetPPO(PPOCfg):
+        seed: int = 42
+        max_env_steps: int = 4096 * 24000
+        check_point_interval: int = 500
+        share_policy_value_features: bool = True
+
+        policy_hidden_layer_sizes: tuple[int, ...] = (256, 128, 64)
+        value_hidden_layer_sizes: tuple[int, ...] = (256, 128, 64)
+        rollouts: int = 16
+        learning_epochs: int = 2
+        mini_batches: int = 8
+        learning_rate: float = 3e-4
+
+
 class locomotion:
+    @rlcfg("go1-rough-terrain-walk")
+    @rlcfg("go1-stairs-terrain-walk")
     @rlcfg("go1-flat-terrain-walk")
     @dataclass
     class Go1WalkPPO(PPOCfg):
@@ -96,6 +133,13 @@ class locomotion:
         learning_epochs: int = 5
         mini_batches: int = 3
         learning_rate: float = 3e-4
+
+    @rlcfg("go2-flat-terrain-walk")
+    @dataclass
+    class Go2WalkPPO(Go1WalkPPO):
+        """
+        Go2 Walk RL config.
+        """
 
 
 class navigation:
