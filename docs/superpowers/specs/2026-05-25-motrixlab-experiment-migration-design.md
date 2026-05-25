@@ -4,7 +4,7 @@ Date: 2026-05-25
 
 ## Goal
 
-Migrate the useful experimental MotrixLab work from `/home/xing/崎岖地形导航迁移任务/MotrixLab` into the clean Git repository at `/home/xing/isaaclab_motrixlab/MotrixLab`, then prepare the result as an open-source-ready version.
+Migrate the useful experimental MotrixLab work from `<source-motrixlab-repo>` into the clean Git repository at `<target-motrixlab-repo>`, then prepare the result as an open-source-ready version.
 
 The migration should preserve the current repository's open-source cleanup work and add the experimental environments, training configuration, and transfer-learning support from the source directory. It should not copy local training outputs or private/temporary artifacts.
 

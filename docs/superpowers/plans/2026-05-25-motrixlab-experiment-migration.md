@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Migrate the experimental MotrixLab environments and transfer-learning support from `/home/xing/崎岖地形导航迁移任务/MotrixLab` into the clean Git repository at `/home/xing/isaaclab_motrixlab/MotrixLab` while keeping the result suitable for open-source release.
+**Goal:** Migrate the experimental MotrixLab environments and transfer-learning support from `<source-motrixlab-repo>` into the clean Git repository at `<target-motrixlab-repo>` while keeping the result suitable for open-source release.
 
 **Architecture:** The target Git repository remains the base. Environment code and assets are merged into `motrix_envs`, RL configuration and trainer changes are merged into `motrix_rl`, and task wrappers are merged into `train_eval_scripts`. Local run outputs, logs, pyc caches, and private experiment artifacts are excluded.
 
@@ -165,29 +165,29 @@ Run:
 
 ```bash
 rsync -a --exclude='__pycache__' --exclude='*.pyc' \
-  /home/xing/崎岖地形导航迁移任务/MotrixLab/motrix_envs/src/motrix_envs/locomotion/anymal_c \
+  <source-motrixlab-repo>/motrix_envs/src/motrix_envs/locomotion/anymal_c \
   motrix_envs/src/motrix_envs/locomotion/
 
 rsync -a --exclude='__pycache__' --exclude='*.pyc' \
-  /home/xing/崎岖地形导航迁移任务/MotrixLab/motrix_envs/src/motrix_envs/locomotion/go2 \
+  <source-motrixlab-repo>/motrix_envs/src/motrix_envs/locomotion/go2 \
   motrix_envs/src/motrix_envs/locomotion/
 
 rsync -a --exclude='__pycache__' --exclude='*.pyc' \
-  /home/xing/崎岖地形导航迁移任务/MotrixLab/motrix_envs/src/motrix_envs/manipulation \
+  <source-motrixlab-repo>/motrix_envs/src/motrix_envs/manipulation \
   motrix_envs/src/motrix_envs/
 
 rsync -a --exclude='__pycache__' --exclude='*.pyc' \
-  /home/xing/崎岖地形导航迁移任务/MotrixLab/motrix_envs/src/motrix_envs/math \
+  <source-motrixlab-repo>/motrix_envs/src/motrix_envs/math \
   motrix_envs/src/motrix_envs/
 
 rsync -a --exclude='__pycache__' --exclude='*.pyc' \
-  /home/xing/崎岖地形导航迁移任务/MotrixLab/motrix_envs/src/motrix_envs/locomotion/go1/common.py \
-  /home/xing/崎岖地形导航迁移任务/MotrixLab/motrix_envs/src/motrix_envs/locomotion/go1/walk_rough_terrain.py \
-  /home/xing/崎岖地形导航迁移任务/MotrixLab/motrix_envs/src/motrix_envs/locomotion/go1/walk_stairs_terrain.py \
+  <source-motrixlab-repo>/motrix_envs/src/motrix_envs/locomotion/go1/common.py \
+  <source-motrixlab-repo>/motrix_envs/src/motrix_envs/locomotion/go1/walk_rough_terrain.py \
+  <source-motrixlab-repo>/motrix_envs/src/motrix_envs/locomotion/go1/walk_stairs_terrain.py \
   motrix_envs/src/motrix_envs/locomotion/go1/
 
 rsync -a --exclude='__pycache__' --exclude='*.pyc' \
-  /home/xing/崎岖地形导航迁移任务/MotrixLab/motrix_envs/src/motrix_envs/locomotion/go1/xmls/ \
+  <source-motrixlab-repo>/motrix_envs/src/motrix_envs/locomotion/go1/xmls/ \
   motrix_envs/src/motrix_envs/locomotion/go1/xmls/
 ```
 
@@ -198,8 +198,8 @@ This copies the rough/stairs scenes, heightmap assets, `materials.xml`, and the 
 Apply the source changes from these files, keeping existing target formatting and comments concise:
 
 ```text
-/home/xing/崎岖地形导航迁移任务/MotrixLab/motrix_envs/src/motrix_envs/locomotion/go1/cfg.py
-/home/xing/崎岖地形导航迁移任务/MotrixLab/motrix_envs/src/motrix_envs/locomotion/go1/walk_np.py
+<source-motrixlab-repo>/motrix_envs/src/motrix_envs/locomotion/go1/cfg.py
+<source-motrixlab-repo>/motrix_envs/src/motrix_envs/locomotion/go1/walk_np.py
 ```
 
 The resulting target files must include:
@@ -317,7 +317,7 @@ Run:
 
 ```bash
 rsync -a --exclude='__pycache__' --exclude='*.pyc' \
-  /home/xing/崎岖地形导航迁移任务/MotrixLab/motrix_envs/src/motrix_envs/navigation/anymal_c/ \
+  <source-motrixlab-repo>/motrix_envs/src/motrix_envs/navigation/anymal_c/ \
   motrix_envs/src/motrix_envs/navigation/anymal_c/
 ```
 
@@ -583,7 +583,7 @@ Run:
 
 ```bash
 rsync -a --exclude='__pycache__' --exclude='*.pyc' \
-  /home/xing/崎岖地形导航迁移任务/MotrixLab/train_eval_scripts/ \
+  <source-motrixlab-repo>/train_eval_scripts/ \
   train_eval_scripts/
 ```
 
@@ -622,7 +622,7 @@ uv lock
 If `uv` is not available, copy the source `uv.lock` only after confirming it includes `scipy` and does not downgrade the root package metadata:
 
 ```bash
-rg -n 'name = "scipy"|version = "0.0.1"|version = "0.0.2"' /home/xing/崎岖地形导航迁移任务/MotrixLab/uv.lock
+rg -n 'name = "scipy"|version = "0.0.1"|version = "0.0.2"' <source-motrixlab-repo>/uv.lock
 ```
 
 Expected: `scipy` is present. Do not accept a root package downgrade.
